@@ -6,7 +6,7 @@ Arabic Unicode text display for MAX7219 8×8 LED matrices using MicroBlocks.
 **Version:** 1.2  
 **License:** MIT
 
-![Arabic and ASCII mixed text on eight FC16 MAX7219 matrices](images/fc16-8-mixed-text.jpg)
+![Arabic and ASCII mixed text on eight FC16 MAX7219 matrices](images/fc16-8-arabic-text.jpg)
 
 LED Matrix Arabic MAX7219 is a MicroBlocks library for displaying Arabic text on chained MAX7219 8×8 LED matrices.
 
