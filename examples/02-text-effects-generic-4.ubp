@@ -1,0 +1,2464 @@
+module main
+author unknown
+version 1 0 
+description ''
+
+script 72 40 {
+whenStarted
+ar_init 18 5 23 'GENERIC' '4'
+ar_set_brightness '1'
+ar_text_effect 'برمج' 'Center' 'dissolve' 1000
+ar_text_effect 'ببساطة' 'Center' 'dissolve' 1000
+}
+
+
+module 'HTTP client' Comm
+author MicroBlocks
+version 1 14 
+depends WiFi 
+tags http network get post put delete 
+choices requestTypes GET POST PUT DELETE 
+description 'Send HTTP requests and get responses back. You can use this library to fetch or store data in online servers, or to control other Wifi-enabled boards.
+'
+
+  spec 'r' 'url' 'fetch URL _' 'str' 'https://microblocks.fun/example.txt'
+  space
+  spec 'r' 'http܃//' 'http #SVG#colon-double-slash _ : port _' 'auto num' 'microblocks.fun/example.txt' 80
+  spec 'r' 'https܃//' 'https #SVG#colon-double-slash _ : port _' 'auto num' 'microblocks.fun/example.txt' 443
+  space
+  spec ' ' 'request' '_ data _ to http #SVG#colon-double-slash _ : port _ : useHTTPS _ : content type _ : extra headers _' 'menu.requestTypes str str num bool str str' 'POST' 'MicroBlocks is fun' 'microblocks.fun' 80 false
+  space
+  spec 'r' '_http_body_start' '_http_body_start _' 'auto' ''
+  spec 'r' '_http_header_text' '_http_header_text _' 'auto' ''
+  spec 'r' '_http_status_text' '_http_status_text _' 'auto' ''
+  spec 'r' '_http_header' '_header _ of response _' 'auto auto' 'content-length' ''
+  spec 'r' '_http_status' '_status of response _' 'auto' ''
+  spec 'r' '_line_end' '_line_end'
+  spec 'r' '_lowercase' '_lowercase _' 'auto' 'ABC Def gH'
+  spec 'r' '_request_url' '_request_url _ method _ body _ : port _ : useHTTPS _ : content type _ : extra headers _' 'str menu.requestTypes str num bool str str' '' 'GET' '' 80 false
+  spec 'r' '_readHTTPResponse' '_readHTTPResponse'
+  spec 'r' '_http_expected_length' '_http_expected_length _' 'str' ''
+  spec 'r' '_http_dechunk' '_http_dechunk _' 'str'
+  spec 'r' '_httpResponseBody' '_httpResponseBody _' 'str' ''
+
+to '_httpResponseBody' response {
+  if (response != '') {if (('_http_status' response) == 200) {
+    if (('[data:find]' 'Transfer-Encoding: chunked' response) > 0) {
+      return ('_http_dechunk' response)
+    } else {
+      return ('[data:copyFromTo]' response ('_http_body_start' response))
+    }
+  } else {
+    return ('_http_status_text' response)
+  }}
+  return 'Failed to get response'
+}
+
+to '_http_body_start' response {
+  return (('[data:find]' ('[data:unicodeString]' ('[data:makeList]' 13 10 13 10)) response) + 4)
+}
+
+to '_http_dechunk' response {
+  local 'crlf' ('[data:join]' ('[data:unicodeString]' 13) ('[data:unicodeString]' 10))
+  local 'result' ('[data:makeList]')
+  local 'chunk_start' ('_http_body_start' response)
+  forever {
+    local 'chunk_size_end' ('[data:find]' crlf response chunk_start)
+    local 'byte_count' 0
+    if (chunk_size_end != -1) {
+      byte_count = (hexToInt ('[data:copyFromTo]' response chunk_start chunk_size_end))
+    }
+    if (byte_count > 0) {
+      chunk_start = ((chunk_size_end + 2) + byte_count)
+      '[data:addLast]' ('[data:copyFromTo]' response (chunk_size_end + 2) chunk_start) result
+    } else {
+      return ('[data:joinStrings]' result)
+    }
+  }
+}
+
+to '_http_expected_length' response {
+  if (('_http_body_start' response) < 10) {
+    comment 'Incomplete HTTP headers'
+    return 0
+  }
+  local 'start' (('[data:find]' 'Content-Length: ' response) + 16)
+  if (start < 16) {
+    comment 'Headers complete but no ''Content-Length:'' header'
+    return -1
+  }
+  comment 'Extract the content length and return the total expected length (including headers).'
+  local 'end' ('[data:find]' ('_line_end') response start)
+  local 'contentLength' ('[data:convertType]' ('[data:copyFromTo]' response start (end - 1)) 'number')
+  return ((('_http_body_start' response) + contentLength) - 1)
+}
+
+to '_http_header' header response {
+  local 'header text' ('_http_header_text' response)
+  header = ('_lowercase' header)
+  repeatUntil ((size (v 'header text')) < 3) {
+    local 'key' ('[data:copyFromTo]' (v 'header text') 1 (('[data:find]' ':' (v 'header text')) - 1))
+    if (('_lowercase' key) == header) {
+      return ('[data:copyFromTo]' (v 'header text') (('[data:find]' ':' (v 'header text')) + 2) (('[data:find]' ('_line_end') (v 'header text')) - 1))
+    }
+    'header text' = ('[data:copyFromTo]' (v 'header text') (('[data:find]' ('_line_end') (v 'header text')) + 2))
+  }
+  return (booleanConstant false)
+}
+
+to '_http_header_text' response {
+  local 'headersStart' (('[data:find]' ('_line_end') response) + 2)
+  return ('[data:copyFromTo]' response headersStart (('_http_body_start' response) - 1))
+}
+
+to '_http_status' response {
+  return (('[data:copyFromTo]' ('_http_status_text' response) 1 4) + 0)
+}
+
+to '_http_status_text' response {
+  return ('[data:copyFromTo]' response ('[data:find]' ' ' response) ('[data:find]' ('_line_end') response))
+}
+
+to '_line_end' {
+  return ('[data:unicodeString]' ('[data:makeList]' 13 10))
+}
+
+to '_lowercase' string {
+  local 'lowercased' ''
+  local 'char code' ''
+  for c (size string) {
+    'char code' = ('[data:unicodeAt]' c string)
+    if (and ((v 'char code') >= 65) ((v 'char code') <= 90)) {
+      'char code' = ((v 'char code') + 32)
+    }
+    lowercased = ('[data:join]' lowercased ('[data:unicodeString]' (v 'char code')))
+  }
+  return lowercased
+}
+
+to '_readHTTPResponse' {
+  local 'response' ''
+  local 'expectedLength' 0
+  local 'lastChunkTime' (millisOp)
+  local 'last chunk' ('[data:convertType]' ('[data:makeList]' 13 10 48 13 10 13 10) 'string')
+  repeatUntil (not ('[net:httpIsConnected]')) {
+    local 'chunk' ('[net:httpResponse]')
+    if ((size chunk) > 0) {
+      response = ('[data:join]' response chunk)
+      lastChunkTime = (millisOp)
+      local 'i' ('[data:find]' (v 'last chunk') response)
+      if (and (and (i > 0) (i == ((size response) - 6))) (('[data:find]' 'Transfer-Encoding: chunked' response) > 0)) {
+        exitLoop
+      }
+      if (expectedLength == 0) {
+        expectedLength = ('_http_expected_length' response)
+      }
+      if (and (expectedLength > 0) ((size response) >= expectedLength)) {
+        exitLoop
+      }
+    } (((millisOp) - lastChunkTime) > 10000) {
+      exitLoop
+    }
+    waitMillis 10
+  }
+  response = ('[data:join]' response ('[net:httpResponse]'))
+  return response
+}
+
+to '_request_url' url method body optionalPort optionalHTTPS optionalContentType optionalExtraHeaders {
+  local 'useHTTPS' (argOrDefault 5 (booleanConstant false))
+  local 'port' (argOrDefault 4 (ifExpression useHTTPS 443 80))
+  local 'contentType' (argOrDefault 6 '')
+  local 'extraHeaders' (argOrDefault 7 ('[data:makeList]'))
+  if (isType extraHeaders 'string') {
+    extraHeaders = ('[data:makeList]' extraHeaders)
+  }
+  local 'host' ''
+  local 'path' ''
+  local 'slashPosition' ('[data:find]' '/' url)
+  if (slashPosition > 0) {
+    host = ('[data:copyFromTo]' url 1 (slashPosition - 1))
+    path = ('[data:copyFromTo]' url (slashPosition + 1))
+  } else {
+    host = url
+  }
+  if (('[net:wifiStatus]') != 'Connected') {
+    return ('[data:join]' '0 Not Connected' ('_line_end'))
+  }
+  port = ('[data:convertType]' port 'number')
+  if useHTTPS {
+    '[net:httpSecureConnect]' host port
+  } else {
+    '[net:httpConnect]' host port
+  }
+  if (not ('[net:httpIsConnected]')) {
+    return ('[data:join]' '0 Could not connect to server' ('_line_end'))
+  }
+  '[net:httpRequest]' method ('[data:join]' host ':' port) path body contentType ('[data:joinStrings]' extraHeaders ('_line_end'))
+  return ('_readHTTPResponse')
+}
+
+to decompose url {
+  local 'host' ''
+  local 'path' ''
+  local 'auxUrl' ''
+  local 'colonPosition' ('[data:find]' '://' url)
+  local 'protocol' (ifExpression (('[data:find]' 'https://' ('_lowercase' url)) > 0) 'https' (ifExpression (('[data:find]' 'http://' ('_lowercase' url)) > 0) 'http' 'https'))
+  local 'port' (ifExpression (protocol == 'https') 443 80)
+  if (colonPosition > 4) {
+    auxUrl = ('[data:copyFromTo]' url (colonPosition + 3))
+  } else {
+    auxUrl = url
+  }
+  local 'slashPosition' ('[data:find]' '/' auxUrl)
+  if (slashPosition > 0) {
+    host = ('[data:copyFromTo]' auxUrl 1 (slashPosition - 1))
+    path = ('[data:copyFromTo]' auxUrl (slashPosition + 1))
+  } else {
+    host = auxUrl
+  }
+  colonPosition = ('[data:find]' ':' host)
+  if (colonPosition > 0) {
+    port = ('[data:convertType]' ('[data:copyFromTo]' host (colonPosition + 1)) 'number')
+    host = ('[data:copyFromTo]' host 1 (colonPosition - 1))
+  }
+  return ('[data:makeList]' protocol host path port)
+}
+
+to 'https܃//' url optionalPort {
+  local 'port' (argOrDefault 2 443)
+  local 'response' ('_request_url' url 'GET' '' port true)
+  return ('_httpResponseBody' response)
+}
+
+to 'http܃//' url optionalPort {
+  local 'port' (argOrDefault 2 80)
+  local 'response' ('_request_url' url 'GET' '' port false)
+  return ('_httpResponseBody' response)
+}
+
+to request method data url optionalPort optionalHTTPS optionalContentType optionalExtraHeaders {
+  local 'useHTTPS' (argOrDefault 5 (booleanConstant false))
+  local 'port' (argOrDefault 4 (ifExpression useHTTPS 443 80))
+  local 'contentType' (argOrDefault 6 '')
+  local 'extraHeaders' (argOrDefault 7 ('[data:makeList]'))
+  local 'response' ('_request_url' url method data port useHTTPS contentType extraHeaders)
+  if (response != '') {
+    local 'status' ('_http_status' response)
+    local 'body start' ('_http_body_start' response)
+    if (and (200 == status) ((v 'body start') > 0)) {
+      sayIt ('[data:copyFromTo]' response (v 'body start'))
+    } else {
+      sayIt ('_http_status_text' response)
+    }
+  } else {
+    sayIt 'Failed to get response'
+  }
+}
+
+to url url {
+  comment 'Returns the content of a web page.
+The URL can be with or without explicit protocol and/or port. If omitted, the default protocol is https (port 443). In the case of http, the default port is 80.
+These forms are valid:
+https://microblocks.fun/example.txt
+http://microblocks.fun/example.txt
+microblocks.fun/example.txt (https by default)
+https://tls-v1-2.badssl.com:1012 (specific port)'
+  local 'infoURL' (decompose url)
+  local 'response' ('_request_url' ('[data:join]' (at 2 infoURL) (ifExpression ((size (at 3 infoURL)) > 0) ('[data:join]' '/' (at 3 infoURL)) '')) 'GET' '' (at 4 infoURL) ((at 1 infoURL) == 'https'))
+  return ('_httpResponseBody' response)
+}
+
+
+module 'LED Matrix Arabic MAX7219' Output
+author 'ZLITNI Hsen'
+version 1 2 
+tags led matrix max7219 arabic rtl display output 
+choices iconMenu Heart 'Arrow Right' 'Arrow Left' 'Arrow Up' 'Arrow Down' 'Arrow Up Down' Diamond Spade 'Circle Outline' Square Bullet 'Sun Rays' Degree 'Plus Minus' 'Less Equal' 'Greater Equal' Paragraph Male Female 'Music Beamed' Micro Cent Pound Yen 
+choices matrixTypeMenu GENERIC FC16 
+choices rotationMenu '0' '90' '180' '270' 
+choices effectMenu dissolve wipe 'row wipe' curtain 
+choices brightnessMenu '0' '1' '2' '3' '4' '5' '6' '7' '8' '9' '10' '11' '12' '13' '14' '15' 
+choices scrollDirectionMenu Auto LTR RTL 
+choices onOffMenu On Off 
+choices maxDevicesMenu '1' '2' '3' '4' '5' '6' '7' '8' 
+choices alignmentMenu Right Center Left 
+description 'Arabic text display for 8x8 LED Matrix with MAX7219 driver (GENERIC or FC16).
+
+WIRING
+- Default pins (CLK=18, CS=5, DIN=23) are for ESP32.
+- On other boards, set the appropriate pins in the "Arabic Matrix init" block.
+
+MATRIX SUPPORT
+- Supports 1 to 8 chained 8x8 matrices (8x8 up to 64x8).
+- Matrix types: GENERIC and FC16.
+- GENERIC has been hardware-tested with 1 matrix.
+- FC16 has been hardware-tested with 1, 4 and 8 matrices.
+
+ROTATION
+- With 1 matrix: 0, 90, 180 and 270 degrees.
+- With more than 1 matrix:
+  0 or 90 selects 0 degrees.
+  180 or 270 selects 180 degrees.
+
+ARABIC TEXT
+- Arabic text is entered directly in Unicode.
+- Contextual Arabic letter forms are handled automatically.
+- Arabic text uses variable-width glyphs.
+- Lam-Alif and Tatweel are supported.
+- Common Arabic punctuation and several keyboard-accessible symbols are supported.
+- Arabic text normally scrolls from left to right.
+
+ASCII TEXT
+- Latin/ASCII text uses the native MicroBlocks font.
+- Variable graphical width is used by trimming empty outer columns.
+
+ARABIC DIGITS
+- The "Arabic digits" reporter converts ASCII digits 0..9 to Arabic-Indic digits ٠..٩.
+- Arabic-Indic numerical order is preserved.
+- Decimal separators and percent can be used where supported.
+
+ALIGNMENT
+- "Arabic Matrix show text" supports Right, Center and Left alignment.
+- Text effects also support Right, Center and Left alignment.
+- Text wider than the display is clipped to the available matrix width.
+
+SCROLL
+- "Arabic Matrix scroll text" supports Auto, LTR and RTL directions.
+- Auto selects the normal direction according to the text type.
+- LTR means physical movement from left to right.
+- RTL means physical movement from right to left.
+- Glyphs are never mirrored to change the scrolling direction.
+
+MIXED TEXT
+- Arabic, Arabic-Indic digits and non-Arabic text can be combined in up to 5 groups.
+- Group 1 is the rightmost group and Group 5 is the leftmost group.
+- Arabic groups keep RTL composition.
+- Non-Arabic groups keep LTR composition.
+- A blank separation is automatically inserted between non-empty groups.
+- Empty groups are ignored.
+
+ICONS
+- The "Arabic icon" reporter provides a selection of symbols from the native MicroBlocks font.
+- Icons can be inserted into compatible text, scroll and mixed blocks.
+- Available icons include arrows, geometric symbols, mathematical symbols, currency symbols and other small pictograms.
+
+TEXT EFFECTS
+- Available effects: dissolve, wipe, row wipe and curtain.
+- Effects operate on the logical framebuffer and preserve the matrix hardware mapping.
+
+BLINK
+- "Arabic Matrix blink text" supports Right, Center and Left alignment.
+- ON and OFF durations can be selected independently.
+- The number of blink repetitions can be selected.
+
+KNOWN LIMITATION
+- ASCII multi-digit sequences embedded directly inside an Arabic text group may appear in reversed numerical order because Arabic composition is RTL.
+- Use the "Arabic digits" reporter or mixed-text blocks when numerical order must be preserved.
+
+License: MIT
+'
+variables _ar_clk _ar_cs _ar_din _ar_rotation _ar_grid _ar_devices _ar_type _ar_spiBusy _ar_initState _ar_displayOn _ar_mixedBuffer _ar_effectTarget _ar_effectScreen _ar_spaceWidth _ar_mixedSpaceWidth 
+
+  spec ' ' 'ar_init' 'Arabic Matrix init -- CLK _ -- CS _ -- DIN _ -- Type _ -- Devices _' 'num num num menu.matrixTypeMenu menu.maxDevicesMenu' 18 5 23 'GENERIC' '1'
+  spec ' ' 'ar_test' 'Arabic Matrix scan'
+  spec ' ' 'ar_set_rotation' 'Arabic Matrix rotation _' 'menu.rotationMenu' '0'
+  spec ' ' 'ar_set_brightness' 'Arabic Matrix brightness _' 'menu.brightnessMenu' '2'
+  spec ' ' 'ar_display_power' 'Arabic Matrix display power _' 'menu.onOffMenu' 'On'
+  spec ' ' 'ar_clear' 'Arabic Matrix clear'
+  spec ' ' 'ar_show_text' 'Arabic Matrix show text _ -- align _' 'auto menu.alignmentMenu' 'ميكروبلوكس' 'Right'
+  spec ' ' 'ar_text_effect' 'Arabic Matrix show text _ -- align _ -- effect _ -- during _ ms' 'auto menu.alignmentMenu menu.effectMenu num' 'برمج ببساطة' 'Right' 'dissolve' 1000
+  spec ' ' 'ar_show_mixed' 'Arabic Matrix show mixed _ _ : _ : _ : _' 'str str str str str' 'ESP32' 'ببساطة' '' '' ''
+  spec ' ' 'ar_blink_text' 'Arabic Matrix blink text _ -- align _ -- on _ ms -- off _ ms -- repeat _ times' 'auto menu.alignmentMenu num num num' 'ميكروبلوكس' 'Right' 500 500 3
+  spec ' ' 'ar_scroll_text' 'Arabic Matrix scroll text _ -- direction _ -- delay _ ms (5-500ms)' 'auto menu.scrollDirectionMenu num' 'برمج ببساطة و استمتع' 'Auto' 40
+  spec ' ' 'ar_scroll_mixed' 'Arabic Matrix scroll mixed -- delay _ ms -- _ _ : _ : _ : _' 'num str str str str str' 25 'ميكرو' 'Blocks' '' '' ''
+  spec 'r' 'ar_digits' 'Arabic digits _' 'auto' '123'
+  spec 'r' 'ar_icon' 'Arabic icon _' 'menu.iconMenu' 'Heart'
+  spec ' ' '_ar_glyph_test' 'Arabic glyph test'
+
+to '_ar_ascii_glyph' char {
+  local 'shape' ('[misc:shapeforChar]' char)
+  if (shape == 0) {
+    return ('[data:makeList]' 0 0 0)
+  }
+  return shape
+}
+
+to '_ar_ascii_width' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  local 'totalWidth' 0
+  for i n {
+    local 'char' ('[data:copyFromTo]' str i i)
+    if (char == ' ') {
+      totalWidth += _ar_spaceWidth
+    } else {
+      local 'shape' ('_ar_ascii_glyph' char)
+      local 'first' 1
+      local 'last' 5
+      repeatUntil (or (first > 5) ((at first shape) != 0)) {
+        first += 1
+      }
+      repeatUntil (or (last < 1) ((at last shape) != 0)) {
+        last += -1
+      }
+      if (first <= last) {
+        totalWidth += ((last - first) + 1)
+      } else {
+        totalWidth += 3
+      }
+    }
+    if (i < n) {
+      local 'nextChar' ('[data:copyFromTo]' str (i + 1) (i + 1))
+      if (and (char != ' ') (nextChar != ' ')) {
+        totalWidth += 1
+      }
+    }
+  }
+  return totalWidth
+}
+
+to '_ar_can_connect_next' code {
+  '#' Letters which do not connect to the following letter.
+  if (code == 1569) {
+    return false
+  } # {
+    v ء
+  }
+  if (code == 1570) {
+    return false
+  } # {
+    v آ
+  }
+  if (code == 1571) {
+    return false
+  } # {
+    v أ
+  }
+  if (code == 1572) {
+    return false
+  } # {
+    v ؤ
+  }
+  if (code == 1573) {
+    return false
+  } # {
+    v إ
+  }
+  if (code == 1575) {
+    return false
+  } # {
+    v ا
+  }
+  if (code == 1583) {
+    return false
+  } # {
+    v د
+  }
+  if (code == 1584) {
+    return false
+  } # {
+    v ذ
+  }
+  if (code == 1585) {
+    return false
+  } # {
+    v ر
+  }
+  if (code == 1586) {
+    return false
+  } # {
+    v ز
+  }
+  if (code == 1608) {
+    return false
+  } # {
+    v و
+  }
+  if (code == 1577) {
+    return false
+  } # {
+    v ة
+  }
+  if (code == 1609) {
+    return false
+  } # {
+    v ى
+  }
+  '#' Remaining supported letters connect to the following letter.
+  if ('_ar_is_arabic_letter' code) {
+    return true
+  }
+  return false
+}
+
+to '_ar_can_connect_prev' code {
+  '#' Hamza alone does not connect.
+  if (code == 1569) {
+    return false
+  }
+  '#' All other supported letters can receive a connection
+  '#' from the preceding letter.
+  if ('_ar_is_arabic_letter' code) {
+    return true
+  }
+  return false
+}
+
+to '_ar_compose_ascii' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  if (n < 1) {
+    return (newList 0)
+  }
+  local 'totalWidth' 0
+  '#' First pass: calculate exact graphical width.
+  for i n {
+    local 'char' ('[data:copyFromTo]' str i i)
+    local 'shape' ('_ar_ascii_glyph' char)
+    if (char == ' ') {
+      totalWidth += _ar_spaceWidth
+    } else {
+      local 'first' 1
+      local 'last' 5
+      repeatUntil (or (first > 5) ((at first shape) != 0)) {
+        first += 1
+      }
+      repeatUntil (or (last < 1) ((at last shape) != 0)) {
+        last += -1
+      }
+      if (first <= last) {
+        totalWidth += ((last - first) + 1)
+      } else {
+        totalWidth += 3
+      }
+    }
+    if (i < n) {
+      local 'nextChar' ('[data:copyFromTo]' str (i + 1) (i + 1))
+      if (and (char != ' ') (nextChar != ' ')) {
+        totalWidth += 1
+      }
+    }
+  }
+  local 'columns' (newList totalWidth 0)
+  local 'pos' 1
+  '#' Second pass: build the compacted text.
+  for i n {
+    local 'char' ('[data:copyFromTo]' str i i)
+    local 'shape' ('_ar_ascii_glyph' char)
+    if (char == ' ') {
+      pos += _ar_spaceWidth
+    } else {
+      local 'first' 1
+      local 'last' 5
+      repeatUntil (or (first > 5) ((at first shape) != 0)) {
+        first += 1
+      }
+      repeatUntil (or (last < 1) ((at last shape) != 0)) {
+        last += -1
+      }
+      if (first <= last) {
+        local 'c' first
+        repeatUntil (c > last) {
+          atPut pos columns (at c shape)
+          pos += 1
+          c += 1
+        }
+      } else {
+        pos += 3
+      }
+    }
+    if (i < n) {
+      local 'nextChar' ('[data:copyFromTo]' str (i + 1) (i + 1))
+      if (and (char != ' ') (nextChar != ' ')) {
+        pos += 1
+      }
+    }
+  }
+  return columns
+}
+
+to '_ar_compose_digits' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  if (n < 1) {
+    return (newList 0)
+  }
+  local 'totalWidth' 0
+  '#' First pass: calculate exact width.
+  for i n {
+    local 'code' ('[data:unicodeAt]' i str)
+    if (code == 32) {
+      totalWidth += _ar_spaceWidth
+    } else {
+      totalWidth += (size ('_ar_glyph_digit' code))
+    }
+    if (i < n) {
+      local 'nextCode' ('[data:unicodeAt]' (i + 1) str)
+      if (and (code != 32) (nextCode != 32)) {
+        totalWidth += 1
+      }
+    }
+  }
+  local 'columns' (newList totalWidth 0)
+  local 'pos' 1
+  '#' Second pass: preserve numerical LTR order.
+  for i n {
+    local 'code' ('[data:unicodeAt]' i str)
+    if (code == 32) {
+      pos += _ar_spaceWidth
+    } else {
+      local 'glyph' ('_ar_glyph_digit' code)
+      for c (size glyph) {
+        atPut pos columns (at c glyph)
+        pos += 1
+      }
+    }
+    if (i < n) {
+      local 'nextCode' ('[data:unicodeAt]' (i + 1) str)
+      if (and (code != 32) (nextCode != 32)) {
+        pos += 1
+      }
+    }
+  }
+  return columns
+}
+
+to '_ar_compose_other' txt {
+  if ('_ar_group_is_digits' txt) {return ('_ar_compose_digits' txt)}
+  return ('_ar_compose_ascii' txt)
+}
+
+to '_ar_compose_text' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  '#' First pass: calculate total graphical width.
+  local 'totalWidth' 0
+  local 'i' n
+  repeatUntil (i < 1) {
+    local 'code' ('[data:unicodeAt]' i str)
+    local 'prevCode' 0
+    local 'nextCode' 0
+    if (i > 1) {
+      prevCode = ('[data:unicodeAt]' (i - 1) str)
+    }
+    if (i < n) {
+      nextCode = ('[data:unicodeAt]' (i + 1) str)
+    }
+    local 'form' ('_ar_form' prevCode code nextCode)
+    local 'glyph' ('_ar_glyph' code form)
+    if (prevCode == 1604) {
+      if (code == 1575) {
+        glyph = ('_ar_glyph_lam_alif' form)
+        i += -1
+      } (code == 1571) {
+        glyph = ('_ar_glyph_lam_alif_hamza_above' form)
+        i += -1
+      } (code == 1570) {
+        glyph = ('_ar_glyph_lam_alif_madda' form)
+        i += -1
+      } (code == 1573) {
+        glyph = ('_ar_glyph_lam_alif_hamza_below' form)
+        i += -1
+      }
+    }
+    totalWidth += (size glyph)
+    i += -1
+  }
+  '#' Allocate the final list once.
+  local 'columns' (newList totalWidth 0)
+  local 'pos' 1
+  '#' Second pass: build visual RTL representation.
+  i = n
+  repeatUntil (i < 1) {
+    local 'code' ('[data:unicodeAt]' i str)
+    local 'prevCode' 0
+    local 'nextCode' 0
+    if (i > 1) {
+      prevCode = ('[data:unicodeAt]' (i - 1) str)
+    }
+    if (i < n) {
+      nextCode = ('[data:unicodeAt]' (i + 1) str)
+    }
+    local 'form' ('_ar_form' prevCode code nextCode)
+    local 'glyph' ('_ar_glyph' code form)
+    if (prevCode == 1604) {
+      if (code == 1575) {
+        glyph = ('_ar_glyph_lam_alif' form)
+        i += -1
+      } (code == 1571) {
+        glyph = ('_ar_glyph_lam_alif_hamza_above' form)
+        i += -1
+      } (code == 1570) {
+        glyph = ('_ar_glyph_lam_alif_madda' form)
+        i += -1
+      } (code == 1573) {
+        glyph = ('_ar_glyph_lam_alif_hamza_below' form)
+        i += -1
+      }
+    }
+    for c (size glyph) {
+      atPut pos columns (at c glyph)
+      pos += 1
+    }
+    i += -1
+  }
+  return columns
+}
+
+to '_ar_curtain_in' {
+  local 'width' (_ar_devices * 8)
+  _ar_effectScreen = (newList width 0)
+  for k 4 {
+    local 'mask1' (1 << (k - 1))
+    local 'mask2' (1 << (8 - k))
+    for x width {
+      atPut x _ar_effectScreen ((at x _ar_effectScreen) | ((at x _ar_effectTarget) & (mask1 | mask2)))
+    }
+    '_ar_screen_to_grid' _ar_effectScreen
+    waitMillis 100
+  }
+}
+
+to '_ar_curtain_out' {
+  local 'width' (_ar_devices * 8)
+  for k 4 {
+    local 'mask1' (1 << (k - 1))
+    local 'mask2' (1 << (8 - k))
+    for x width {
+      atPut x _ar_effectScreen ((at x _ar_effectScreen) & (255 - (mask1 | mask2)))
+    }
+    '_ar_screen_to_grid' _ar_effectScreen
+    waitMillis 100
+  }
+  ar_clear
+}
+
+to '_ar_digits_width' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  if (n < 1) {
+    return 0
+  }
+  local 'totalWidth' 0
+  for i n {
+    local 'code' ('[data:unicodeAt]' i str)
+    if (code == 32) {
+      totalWidth += _ar_spaceWidth
+    } else {
+      totalWidth += (size ('_ar_glyph_digit' code))
+    }
+    if (i < n) {
+      local 'nextCode' ('[data:unicodeAt]' (i + 1) str)
+      if (and (code != 32) (nextCode != 32)) {
+        totalWidth += 1
+      }
+    }
+  }
+  return totalWidth
+}
+
+to '_ar_dissolve_out' {
+  local 'width' (_ar_devices * 8)
+  local 'order' ('_ar_shuffle_indices' (width * 8))
+  for k (width * 8) {
+    local 'idx' ((at k order) - 1)
+    local 'x' ((idx / 8) + 1)
+    local 'y' ((idx % 8) + 1)
+    atPut x _ar_effectScreen ((at x _ar_effectScreen) & (255 - (1 << (y - 1))))
+    if ((k % _ar_devices) == 0) {
+      '_ar_screen_to_grid' _ar_effectScreen
+      waitMillis 2
+    }
+  }
+  ar_clear
+}
+
+to '_ar_ensure_ready' {
+  if (_ar_initState == 2) {return 0}
+  if (_ar_initState == 1) {
+    repeatUntil (_ar_initState == 2) {
+      waitMillis 1
+    }
+    return 0
+  }
+  '#' Give an explicit init block a chance to start.
+  waitMillis 1
+  if (_ar_initState == 2) {
+    return 0
+  }
+  if (_ar_initState == 1) {
+    repeatUntil (_ar_initState == 2) {
+      waitMillis 1
+    }
+    return 0
+  }
+  '#' Default initialization for ESP32.
+  ar_init 18 5 23 'GENERIC' '1'
+}
+
+to '_ar_form' prevCode code nextCode {
+  local 'joinPrev' false
+  local 'joinNext' false
+  '#' Connection with the preceding character in logical Arabic text.
+  if (and ('_ar_can_connect_next' prevCode) ('_ar_can_connect_prev' code)) {
+    joinPrev = true
+  }
+  '#' Connection with the following character.
+  if (and ('_ar_can_connect_next' code) ('_ar_can_connect_prev' nextCode)) {
+    joinNext = true
+  }
+  '#' 0 '=' isolated
+  '#' 1 '=' initial
+  '#' 2 '=' medial
+  '#' 3 '=' final
+  if (and joinPrev joinNext) {
+    return 2
+  }
+  if joinPrev {
+    return 3
+  }
+  if joinNext {
+    return 1
+  }
+  return 0
+}
+
+to '_ar_glyph' code form {
+  if (code < 1590) {return ('_ar_glyph_low' code form)}
+  return ('_ar_glyph_high' code form)
+}
+
+to '_ar_glyph_ain' form {
+  '#' ع
+  '#' isolated
+  if (form == 0) {
+    return ('[data:makeList]' 96 152 148 148)
+  }
+  '#' initial
+  if (form == 1) {
+    return ('[data:makeList]' 32 32 56 36 36)
+  }
+  '#' medial
+  if (form == 2) {
+    return ('[data:makeList]' 32 36 44 20 44 36)
+  }
+  '#' final
+  return ('[data:makeList]' 68 172 148 172 36)
+}
+
+to '_ar_glyph_alif' form {
+  'ا' #
+  return ('[data:makeList]' 0 63)
+}
+
+to '_ar_glyph_alif_hamza_above' form {
+  'أ' #
+  return ('[data:makeList]' 4 6 61 5)
+}
+
+to '_ar_glyph_alif_hamza_below' form {
+  'إ' #
+  return ('[data:makeList]' 128 192 191 160)
+}
+
+to '_ar_glyph_alif_madda' form {
+  '#' آ
+  if (or (form == 0) (form == 1)) {
+    return ('[data:makeList]' 2 1 61 1)
+  }
+  return ('[data:makeList]' 2 1 61 33)
+}
+
+to '_ar_glyph_alif_maqsura' form {
+  '#' ى
+  if (form == 3) {
+    return ('[data:makeList]' 96 128 128 152 164 68 24 32)
+  }
+  return ('[data:makeList]' 0 96 128 128 152 164 68 24)
+}
+
+to '_ar_glyph_ba' form {
+  'ب' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 56 32 32 160 32 32 56)
+  }
+  return ('[data:makeList]' 32 32 160 56)
+}
+
+to '_ar_glyph_dad' form {
+  '#' ض
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 224 128 128 224 50 40 36 56)
+  }
+  return ('[data:makeList]' 32 32 50 40 36 56)
+}
+
+to '_ar_glyph_dal' form {
+  '#' د
+  return ('[data:makeList]' 0 32 36 56)
+}
+
+to '_ar_glyph_dhal' form {
+  '#' ذ
+  return ('[data:makeList]' 0 32 37 56)
+}
+
+to '_ar_glyph_digit' code {
+  if (code == 44) {return ('[data:makeList]' 128 64)}
+  if (code == 46) {return ('[data:makeList]' 128)}
+  if (code == 1632) {return ('[data:makeList]' 8 28 8)}
+  if (code == 1633) {return ('[data:makeList]' 127)}
+  if (code == 1634) {return ('[data:makeList]' 71 58 2 2 1)}
+  if (code == 1635) {return ('[data:makeList]' 71 58 3 2 3)}
+  if (code == 1636) {return ('[data:makeList]' 54 73 73)}
+  if (code == 1637) {return ('[data:makeList]' 62 65 65 66 60)}
+  if (code == 1638) {return ('[data:makeList]' 1 2 2 58 71)}
+  if (code == 1639) {return ('[data:makeList]' 15 24 96 24 15)}
+  if (code == 1640) {return ('[data:makeList]' 120 12 3 12 120)}
+  if (code == 1641) {return ('[data:makeList]' 6 9 10 124)}
+  if (code == 37) {return ('[data:makeList]' 66 32 16 8 4 66)}
+  return ('[data:makeList]' 0 0 0)
+}
+
+to '_ar_glyph_fa' form {
+  '#' ف
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 16 32 32 32 45 42 42 60)
+  }
+  if (form == 1) {
+    return ('[data:makeList]' 32 32 32 45 42 42 60)
+  }
+  return ('[data:makeList]' 32 45 50 50 44 32)
+}
+
+to '_ar_glyph_ghain' form {
+  '#' غ
+  if (form == 0) {
+    return ('[data:makeList]' 96 152 149 148)
+  }
+  if (form == 1) {
+    return ('[data:makeList]' 32 32 56 37 36)
+  }
+  if (form == 2) {
+    return ('[data:makeList]' 32 36 44 21 44 36)
+  }
+  return ('[data:makeList]' 68 172 149 172 36)
+}
+
+to '_ar_glyph_ha' form {
+  '#' ح
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 96 148 148 148 24 16)
+  }
+  return ('[data:makeList]' 32 32 40 40 40 48 32)
+}
+
+to '_ar_glyph_ha_heh' form {
+  '#' ه
+  if (form == 0) {
+    return ('[data:makeList]' 24 36 34 36 24)
+  }
+  if (or (form == 1) (form == 2)) {
+    return ('[data:makeList]' 32 56 52 42 44 24)
+  }
+  return ('[data:makeList]' 8 20 20 60 32 32)
+}
+
+to '_ar_glyph_hamza' form {
+  '#' ء
+  return ('[data:makeList]' 40 52 36)
+}
+
+to '_ar_glyph_high' code form {
+  if (code == 1590) {return ('_ar_glyph_dad' form)}
+  if (code == 1591) {return ('_ar_glyph_tah' form)}
+  if (code == 1592) {return ('_ar_glyph_zah' form)}
+  if (code == 1593) {return ('_ar_glyph_ain' form)}
+  if (code == 1594) {return ('_ar_glyph_ghain' form)}
+  if (code == 1600) {return ('_ar_glyph_tatweel' form)}
+  if (code == 1601) {return ('_ar_glyph_fa' form)}
+  if (code == 1602) {return ('_ar_glyph_qaf' form)}
+  if (code == 1603) {return ('_ar_glyph_kaf' form)}
+  if (code == 1604) {return ('_ar_glyph_lam' form)}
+  if (code == 1605) {return ('_ar_glyph_meem' form)}
+  if (code == 1606) {return ('_ar_glyph_noon' form)}
+  if (code == 1607) {return ('_ar_glyph_ha_heh' form)}
+  if (code == 1608) {return ('_ar_glyph_waw' form)}
+  if (code == 1609) {return ('_ar_glyph_alif_maqsura' form)}
+  if (code == 1610) {return ('_ar_glyph_ya' form)}
+  if (code == 1642) {return ('[data:makeList]' 66 32 16 8 4 66)}
+  return ('[data:makeList]' 0 0 0)
+}
+
+to '_ar_glyph_jeem' form {
+  '#' ج
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 96 148 180 148 24 16)
+  }
+  return ('[data:makeList]' 32 32 40 168 40 48 32)
+}
+
+to '_ar_glyph_kaf' form {
+  '#' ك
+  if (form == 0) {
+    return ('[data:makeList]' 16 32 32 42 45 41 32 31)
+  }
+  if (form == 3) {
+    return ('[data:makeList]' 16 32 32 42 45 41 32 63)
+  }
+  return ('[data:makeList]' 32 32 40 44 42 49)
+}
+
+to '_ar_glyph_kha' form {
+  '#' خ
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 96 148 149 148 24 16)
+  }
+  return ('[data:makeList]' 32 32 40 42 40 48 32)
+}
+
+to '_ar_glyph_lam' form {
+  'ل' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 96 128 128 128 127)
+  }
+  return ('[data:makeList]' 32 32 32 63)
+}
+
+to '_ar_glyph_lam_alif' form {
+  'لا' #
+  return ('[data:makeList]' 0 35 52 40 55)
+}
+
+to '_ar_glyph_lam_alif_hamza_above' form {
+  '#' لأ
+  return ('[data:makeList]' 0 42 61 37 32 63)
+}
+
+to '_ar_glyph_lam_alif_hamza_below' form {
+  '#' لإ
+  return ('[data:makeList]' 0 160 255 96 32 63)
+}
+
+to '_ar_glyph_lam_alif_madda' form {
+  '#' لآ
+  return ('[data:makeList]' 0 34 61 33 33 32 63)
+}
+
+to '_ar_glyph_low' code form {
+  '#' ASCII symbols used in Arabic text
+  if (code < 128) {
+    return ('_ar_glyph_symbol' code)
+  }
+  '#' Arabic comma ،
+  if (code == 1548) {
+    return ('[data:makeList]' 0 96 16 0)
+  }
+  '#' Arabic question mark ؟
+  if (code == 1567) {
+    return ('[data:makeList]' 6 9 177 2)
+  }
+  if (code == 1569) {
+    return ('_ar_glyph_hamza' form)
+  }
+  if (code == 1570) {
+    return ('_ar_glyph_alif_madda' form)
+  }
+  if (code == 1571) {
+    return ('_ar_glyph_alif_hamza_above' form)
+  }
+  if (code == 1572) {
+    return ('_ar_glyph_waw_hamza' form)
+  }
+  if (code == 1573) {
+    return ('_ar_glyph_alif_hamza_below' form)
+  }
+  if (code == 1574) {
+    return ('_ar_glyph_ya_hamza' form)
+  }
+  if (code == 1575) {
+    return ('_ar_glyph_alif' form)
+  }
+  if (code == 1576) {
+    return ('_ar_glyph_ba' form)
+  }
+  if (code == 1577) {
+    return ('_ar_glyph_teh_marbuta' form)
+  }
+  if (code == 1578) {
+    return ('_ar_glyph_ta' form)
+  }
+  if (code == 1579) {
+    return ('_ar_glyph_tha' form)
+  }
+  if (code == 1580) {
+    return ('_ar_glyph_jeem' form)
+  }
+  if (code == 1581) {
+    return ('_ar_glyph_ha' form)
+  }
+  if (code == 1582) {
+    return ('_ar_glyph_kha' form)
+  }
+  if (code == 1583) {
+    return ('_ar_glyph_dal' form)
+  }
+  if (code == 1584) {
+    return ('_ar_glyph_dhal' form)
+  }
+  if (code == 1585) {
+    return ('_ar_glyph_ra' form)
+  }
+  if (code == 1586) {
+    return ('_ar_glyph_zay' form)
+  }
+  if (code == 1587) {
+    return ('_ar_glyph_seen' form)
+  }
+  if (code == 1588) {
+    return ('_ar_glyph_sheen' form)
+  }
+  if (code == 1589) {
+    return ('_ar_glyph_sad' form)
+  }
+  return ('[data:makeList]' 0 0 0)
+}
+
+to '_ar_glyph_meem' form {
+  'م' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 192 32 32 24 36 40 16)
+  }
+  return ('[data:makeList]' 32 32 24 36 40 16)
+}
+
+to '_ar_glyph_noon' form {
+  'ن' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 96 128 128 136 128 96)
+  }
+  return ('[data:makeList]' 32 32 32 58)
+}
+
+to '_ar_glyph_qaf' form {
+  '#' ق
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 64 130 157 146 146 124)
+  }
+  if (form == 1) {
+    return ('[data:makeList]' 32 34 45 42 42 60)
+  }
+  return ('[data:makeList]' 32 45 50 50 45 32)
+}
+
+to '_ar_glyph_ra' form {
+  '#' ر
+  return ('[data:makeList]' 128 128 128 64 32)
+}
+
+to '_ar_glyph_sad' form {
+  '#' ص
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 224 128 128 224 48 40 36 56)
+  }
+  return ('[data:makeList]' 32 32 48 40 36 56)
+}
+
+to '_ar_glyph_seen' form {
+  'س' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 224 128 128 248 32 56 32 56)
+  }
+  return ('[data:makeList]' 32 32 56 32 56 32 56)
+}
+
+to '_ar_glyph_sheen' form {
+  '#' ش
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 224 128 128 248 34 57 34 56)
+  }
+  return ('[data:makeList]' 32 32 56 34 57 34 56)
+}
+
+to '_ar_glyph_symbol' code {
+  if (code == 40) {return ('[data:makeList]' 0 60 66 129 0)}
+  '#' Space
+  if (code == 32) {
+    return (newList _ar_spaceWidth 0)
+  }
+  '#' !
+  if (code == 33) {
+    return ('[data:makeList]' 95 0)
+  }
+  '#' '%'
+  if (code == 37) {
+    return ('[data:makeList]' 0 66 32 16 8 4 66 0)
+  }
+  '#'
+  if (code == 41) {
+    return ('[data:makeList]' 0 129 66 60 0)
+  }
+  '#' '*'
+  if (code == 42) {
+    return ('[data:makeList]' 0 84 56 254 56 84 0)
+  }
+  '#' '+'
+  if (code == 43) {
+    return ('[data:makeList]' 0 16 16 124 16 16 0)
+  }
+  '#' '-'
+  if (code == 45) {
+    return ('[data:makeList]' 0 32 32 32 32 32 0)
+  }
+  '#' .
+  if (code == 46) {
+    return ('[data:makeList]' 32 0)
+  }
+  '#' '/'
+  if (code == 47) {
+    return ('[data:makeList]' 0 64 32 16 8 4 0)
+  }
+  '#' 0
+  if (code == 48) {
+    return ('[data:makeList]' 62 81 73 69 62 0)
+  }
+  '#' 1
+  if (code == 49) {
+    return ('[data:makeList]' 4 66 127 64 0)
+  }
+  '#' 2
+  if (code == 50) {
+    return ('[data:makeList]' 102 81 81 73 70 0)
+  }
+  '#' 3
+  if (code == 51) {
+    return ('[data:makeList]' 73 73 73 73 54 0)
+  }
+  '#' 4
+  if (code == 52) {
+    return ('[data:makeList]' 31 16 16 124 16 0)
+  }
+  '#' 5
+  if (code == 53) {
+    return ('[data:makeList]' 79 73 73 73 49 0)
+  }
+  '#' 6
+  if (code == 54) {
+    return ('[data:makeList]' 62 73 73 73 50 0)
+  }
+  '#' 7
+  if (code == 55) {
+    return ('[data:makeList]' 1 9 121 13 11 0)
+  }
+  '#' 8
+  if (code == 56) {
+    return ('[data:makeList]' 54 73 73 73 54 0)
+  }
+  '#' 9
+  if (code == 57) {
+    return ('[data:makeList]' 38 73 73 73 62 0)
+  }
+  '#' '='
+  if (code == 61) {
+    return ('[data:makeList]' 0 40 40 40 40 40 0)
+  }
+  return ('[data:makeList]' 0 0 0)
+}
+
+to '_ar_glyph_ta' form {
+  'ت' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 56 32 34 32 34 32 56)
+  }
+  return ('[data:makeList]' 32 34 32 58)
+}
+
+to '_ar_glyph_tah' form {
+  '#' ط
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 32 63 48 40 36 56)
+  }
+  return ('[data:makeList]' 32 32 63 48 40 36 56)
+}
+
+to '_ar_glyph_tatweel' form {
+  '#' ـ U+0640
+  '#' Each tatweel extends the connection by 1 pixel.
+  return ('[data:makeList]' 32)
+}
+
+to '_ar_glyph_teh_marbuta' form {
+  '#' ة
+  if (form == 3) {
+    return ('[data:makeList]' 8 21 20 61 32 32)
+  }
+  return ('[data:makeList]' 57 36 37 56)
+}
+
+to '_ar_glyph_test' {
+  '_ar_ensure_ready'
+  '#' Exact 8 x8 matrix test
+  local 'glyph' ('[data:makeList]' 0 0 0 0 3 52 40 55)
+  local 'width' (_ar_devices * 8)
+  local 'screen' (newList width 0)
+  local 'start' ((width - (size glyph)) + 1)
+  for i (size glyph) {
+    atPut ((start + i) - 1) screen (at i glyph)
+  }
+  '_ar_screen_to_grid' screen
+}
+
+to '_ar_glyph_tha' form {
+  'ث' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 56 32 36 34 36 32 56)
+  }
+  return ('[data:makeList]' 32 34 33 58)
+}
+
+to '_ar_glyph_waw' form {
+  '#' و
+  return ('[data:makeList]' 128 176 168 112)
+}
+
+to '_ar_glyph_waw_hamza' form {
+  'ؤ' #
+  return ('[data:makeList]' 132 182 173 117)
+}
+
+to '_ar_glyph_ya' form {
+  'ي' #
+  '#' isolated '&' final
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 32 64 192 64 216 36 4 24)
+  }
+  '#' initial
+  if (form == 1) {
+    return ('[data:makeList]' 32 160 32 184)
+  }
+  '#' medial
+  return ('[data:makeList]' 32 160 56 160)
+}
+
+to '_ar_glyph_ya_hamza' form {
+  'ئ' #
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 106 141 133 152 164 68 24)
+  }
+  if (form == 1) {
+    return ('[data:makeList]' 32 42 61 5)
+  }
+  return ('[data:makeList]' 32 42 61 37)
+}
+
+to '_ar_glyph_zah' form {
+  '#' ظ
+  if (or (form == 0) (form == 3)) {
+    return ('[data:makeList]' 32 63 48 40 37 56)
+  }
+  return ('[data:makeList]' 32 32 63 48 40 37 56)
+}
+
+to '_ar_glyph_zay' form {
+  '#' ز
+  return ('[data:makeList]' 128 128 128 64 40)
+}
+
+to '_ar_group_is_arabic' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  local 'hasSymbol' false
+  if (n < 1) {
+    return false
+  }
+  for i n {
+    local 'code' ('[data:unicodeAt]' i str)
+    if (code == 32) {
+      '#' Ignore spaces.
+    } (code == 33) {
+      hasSymbol = true
+    } (code == 37) {
+      hasSymbol = true
+    } (code == 40) {
+      hasSymbol = true
+    } (code == 41) {
+      hasSymbol = true
+    } (code == 42) {
+      hasSymbol = true
+    } (code == 43) {
+      hasSymbol = true
+    } (code == 45) {
+      hasSymbol = true
+    } (code == 46) {
+      hasSymbol = true
+    } (code == 47) {
+      hasSymbol = true
+    } (code == 61) {
+      hasSymbol = true
+    } (code == 1548) {
+      hasSymbol = true
+    } (code == 1567) {
+      hasSymbol = true
+    } else {
+      if ('_ar_is_arabic_letter' code) {return true}
+      return false
+    }
+  }
+  return hasSymbol
+}
+
+to '_ar_group_is_digits' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  if (n < 1) {
+    return false
+  }
+  for i n {
+    local 'code' ('[data:unicodeAt]' i str)
+    if (code != 32) {
+      if (and (code >= 1632) (code <= 1641)) {return true}
+      return false
+    }
+  }
+  return false
+}
+
+to '_ar_init_hw' clk cs din matrixType maxDevices {
+  _ar_clk = clk
+  _ar_cs = cs
+  _ar_din = din
+  _ar_rotation = 0
+  _ar_type = matrixType
+  _ar_devices = ('[data:convertType]' maxDevices 'number')
+  if (not (and (_ar_devices >= 1) (_ar_devices <= 8))) {
+    _ar_devices = 1
+  }
+  _ar_spaceWidth = 3
+  _ar_mixedSpaceWidth = 2
+  _ar_grid = (newList (_ar_devices * 8) 0)
+  setPinMode _ar_clk 'output'
+  setPinMode _ar_cs 'output'
+  setPinMode _ar_din 'output'
+  digitalWriteOp _ar_cs true
+  digitalWriteOp _ar_clk false
+  _ar_spiBusy = false
+  repeat 3 {
+    '_ar_write' 12 0
+    waitMillis 10
+    '_ar_write' 15 0
+    '_ar_write' 12 1
+    '_ar_write' 9 0
+    '_ar_write' 11 7
+    '_ar_write' 10 2
+    for r 8 {
+      '_ar_write' r 0
+    }
+  }
+  _ar_displayOn = true
+}
+
+to '_ar_is_arabic_letter' code {
+  '#' Main Arabic alphabet: ا .. ي
+  if (and (code >= 1575) (code <= 1610)) {
+    return true
+  }
+  '#' Common additional Arabic letters:
+  '#' ء آ أ ؤ إ ئ
+  if (code == 1569) {
+    return true
+  } # {
+    v ء
+  }
+  if (code == 1570) {
+    return true
+  } # {
+    v آ
+  }
+  if (code == 1571) {
+    return true
+  } # {
+    v أ
+  }
+  if (code == 1572) {
+    return true
+  } # {
+    v ؤ
+  }
+  if (code == 1573) {
+    return true
+  } # {
+    v إ
+  }
+  if (code == 1574) {
+    return true
+  } # {
+    v ئ
+  }
+  if (code == 1600) {
+    return true
+  } # {
+    v ـ
+  }
+  return false
+}
+
+to '_ar_mirror_byte' b {
+  local 'result' 0
+  for i 8 {
+    if ((b & (1 << (i - 1))) != 0) {result = (result | (128 >> (i - 1)))}
+  }
+  return result
+}
+
+to '_ar_other_width' txt {
+  if ('_ar_group_is_digits' txt) {return ('_ar_digits_width' txt)}
+  return ('_ar_ascii_width' txt)
+}
+
+to '_ar_pixel_addr' px py {
+  local 'x' ('[data:convertType]' px 'number')
+  local 'y' ('[data:convertType]' py 'number')
+  local 'width' (_ar_devices * 8)
+  if (or (or (x < 1) (x > width)) (or (y < 1) (y > 8))) {
+    return (newList 0 0)
+  }
+  local 'logicalDevice' (((x - 1) / 8) + 1)
+  local 'colInDevice' (((x - 1) % 8) + 1)
+  local 'physicalDevice' ((_ar_devices - logicalDevice) + 1)
+  local 'physicalCol' colInDevice
+  local 'physicalRow' y
+  if (_ar_type == 'GENERIC') {
+    local 'oldCol' physicalCol
+    physicalCol = (9 - physicalRow)
+    physicalRow = oldCol
+  }
+  local 'mask' (128 >> (physicalCol - 1))
+  local 'gridIdx' (((physicalDevice - 1) * 8) + physicalRow)
+  return ('[data:makeList]' gridIdx mask)
+}
+
+to '_ar_render' {
+  '_ar_spi_lock'
+  for r 8 {
+    '_ar_send_row_from' r _ar_grid
+  }
+  '_ar_spi_unlock'
+}
+
+to '_ar_rotate_screen_180' screen {
+  local 'width' (size screen)
+  local 'result' (newList width 0)
+  for x width {
+    local 'src' (at ((width + 1) - x) screen)
+    atPut x result ('_ar_mirror_byte' src)
+  }
+  return result
+}
+
+to '_ar_rotate_screen_270' screen {
+  local 'result' (newList 8 0)
+  for x 8 {
+    for y 8 {
+      if ((((at x screen) >> (y - 1)) & 1) != 0) {
+        local 'newX' y
+        local 'newY' (9 - x)
+        atPut newX result ((at newX result) | (1 << (newY - 1)))
+      }
+    }
+  }
+  return result
+}
+
+to '_ar_rotate_screen_90' screen {
+  local 'result' (newList 8 0)
+  for x 8 {
+    for y 8 {
+      if ((((at x screen) >> (y - 1)) & 1) != 0) {
+        local 'newX' (9 - y)
+        local 'newY' x
+        atPut newX result ((at newX result) | (1 << (newY - 1)))
+      }
+    }
+  }
+  return result
+}
+
+to '_ar_row_wipe_in' {
+  local 'width' (_ar_devices * 8)
+  _ar_effectScreen = (newList width 0)
+  for y 8 {
+    local 'mask' (1 << (y - 1))
+    for x width {
+      atPut x _ar_effectScreen ((at x _ar_effectScreen) | ((at x _ar_effectTarget) & mask))
+    }
+    '_ar_screen_to_grid' _ar_effectScreen
+    waitMillis 60
+  }
+}
+
+to '_ar_row_wipe_out' {
+  local 'width' (_ar_devices * 8)
+  for y 8 {
+    local 'mask' (1 << (y - 1))
+    for x width {
+      atPut x _ar_effectScreen ((at x _ar_effectScreen) & (255 - mask))
+    }
+    '_ar_screen_to_grid' _ar_effectScreen
+    waitMillis 60
+  }
+  ar_clear
+}
+
+to '_ar_scan_modules' {
+  local 'w' (_ar_devices * 8)
+  for d _ar_devices {
+    '#' Start each step with a completely clear display.
+    atPut 'all' _ar_grid 0
+    '#' Show the previous module number.
+    if (d > 1) {
+      local 'previous' (d - 1)
+      local 'previousLeft' ((w - (previous * 8)) + 1)
+      local 'char' ('[data:toString]' previous)
+      local 'shape' ('[misc:shapeforChar]' char)
+      local 'startX' (previousLeft + 2)
+      for c 5 {
+        local 'col' (at c shape)
+        for y 8 {
+          if (((col >> (y - 1)) & 1) != 0) {'_ar_scan_pixel' ((startX + c) - 1) y true}
+        }
+      }
+    }
+    '#' Light the current module completely.
+    local 'moduleLeft' ((w - (d * 8)) + 1)
+    for x 8 {
+      for y 8 {
+        '_ar_scan_pixel' ((moduleLeft + x) - 1) y true
+      }
+    }
+    '_ar_render'
+    waitMillis 300
+  }
+  '#' Final step: show only the last module number.
+  atPut 'all' _ar_grid 0
+  local 'char' ('[data:toString]' _ar_devices)
+  local 'shape' ('[misc:shapeforChar]' char)
+  local 'moduleLeft' ((w - (_ar_devices * 8)) + 1)
+  local 'startX' (moduleLeft + 2)
+  for c 5 {
+    local 'col' (at c shape)
+    for y 8 {
+      if (((col >> (y - 1)) & 1) != 0) {'_ar_scan_pixel' ((startX + c) - 1) y true}
+    }
+  }
+  '_ar_render'
+  waitMillis 200
+  '#' Final clear.
+  atPut 'all' _ar_grid 0
+  '_ar_render'
+}
+
+to '_ar_scan_pixel' x y onOff {
+  if (_ar_rotation == 90) {
+    '_ar_set_pixel_buffer' (9 - y) x onOff
+  } (_ar_rotation == 180) {
+    '_ar_set_pixel_buffer' (((_ar_devices * 8) + 1) - x) (9 - y) onOff
+  } (_ar_rotation == 270) {
+    '_ar_set_pixel_buffer' y (9 - x) onOff
+  } else {
+    '_ar_set_pixel_buffer' x y onOff
+  }
+}
+
+to '_ar_screen_to_grid' screen {
+  local 'width' (_ar_devices * 8)
+  if (_ar_rotation == 90) {
+    screen = ('_ar_rotate_screen_90' screen)
+  } (_ar_rotation == 180) {
+    screen = ('_ar_rotate_screen_180' screen)
+  } (_ar_rotation == 270) {
+    screen = ('_ar_rotate_screen_270' screen)
+  }
+  atPut 'all' _ar_grid 0
+  for x width {
+    local 'column' (at x screen)
+    for y 8 {
+      if (((column >> (y - 1)) & 1) != 0) {'_ar_set_pixel_buffer' x y true}
+    }
+  }
+  '_ar_render'
+}
+
+to '_ar_scroll_columns_ltr' columns delayMs {
+  local 'textWidth' (size columns)
+  local 'width' (_ar_devices * 8)
+  local 'delayValue' ('[data:convertType]' delayMs 'number')
+  delayValue = (maximum 5 (minimum 500 delayValue))
+  if (textWidth < 1) {
+    ar_clear
+    return 0
+  }
+  '#' Arabic scrolling direction:
+  '#' text starts outside the left side and moves to the right.
+  local 'leftX' (1 - textWidth)
+  repeatUntil (leftX > (width + 1)) {
+    local 'screen' (newList width 0)
+    for x width {
+      local 'src' ((x - leftX) + 1)
+      if (and (src >= 1) (src <= textWidth)) {
+        atPut x screen (at src columns)
+      }
+    }
+    '_ar_screen_to_grid' screen
+    waitMillis delayValue
+    leftX += 1
+  }
+  ar_clear
+}
+
+to '_ar_scroll_columns_rtl' columns delayMs {
+  local 'textWidth' (size columns)
+  local 'width' (_ar_devices * 8)
+  local 'delayValue' ('[data:convertType]' delayMs 'number')
+  delayValue = (maximum 5 (minimum 500 delayValue))
+  if (textWidth < 1) {
+    ar_clear
+    return 0
+  }
+  '#' Text starts outside the right side and moves to the left.
+  local 'leftX' (width + 1)
+  repeatUntil (leftX < (1 - textWidth)) {
+    local 'screen' (newList width 0)
+    for x width {
+      local 'src' ((x - leftX) + 1)
+      if (and (src >= 1) (src <= textWidth)) {
+        atPut x screen (at src columns)
+      }
+    }
+    '_ar_screen_to_grid' screen
+    waitMillis delayValue
+    leftX += -1
+  }
+  ar_clear
+}
+
+to '_ar_send_row_from' row frame {
+  digitalWriteOp _ar_cs false
+  local 'd' _ar_devices
+  repeatUntil (d < 1) {
+    local 'gridIdx' (((d - 1) * 8) + row)
+    '_ar_spi_send' row
+    '_ar_spi_send' (at gridIdx frame)
+    d += -1
+  }
+  digitalWriteOp _ar_cs true
+}
+
+to '_ar_set_pixel_buffer' px py onOff {
+  local 'addr' ('_ar_pixel_addr' px py)
+  if ((size addr) == 0) {
+    return 0
+  }
+  local 'gridIdx' (at 1 addr)
+  local 'mask' (at 2 addr)
+  local 'current' (at gridIdx _ar_grid)
+  if onOff {
+    atPut gridIdx _ar_grid (current | mask)
+  } else {
+    atPut gridIdx _ar_grid (current & (255 - mask))
+  }
+}
+
+to '_ar_shuffle_indices' n {
+  local 'arr' (newList n 0)
+  for i n {
+    atPut i arr i
+  }
+  local 'i' n
+  repeatUntil (i < 2) {
+    local 'j' (random 1 i)
+    local 'tmp' (at i arr)
+    atPut i arr (at j arr)
+    atPut j arr tmp
+    i += -1
+  }
+  return arr
+}
+
+to '_ar_spi_lock' {
+  repeatUntil (not _ar_spiBusy) {
+    waitMillis 1
+  }
+  _ar_spiBusy = true
+}
+
+to '_ar_spi_send' byte {
+  local 'mask' 128
+  repeat 8 {
+    digitalWriteOp _ar_clk false
+    digitalWriteOp _ar_din ((byte & mask) != 0)
+    digitalWriteOp _ar_clk true
+    mask = (mask >> 1)
+  }
+}
+
+to '_ar_spi_unlock' {
+  _ar_spiBusy = false
+}
+
+to '_ar_text_width' txt {
+  local 'str' ('[data:toString]' txt)
+  local 'n' (size str)
+  local 'totalWidth' 0
+  local 'i' n
+  repeatUntil (i < 1) {
+    local 'code' ('[data:unicodeAt]' i str)
+    local 'prevCode' 0
+    local 'nextCode' 0
+    if (i > 1) {
+      prevCode = ('[data:unicodeAt]' (i - 1) str)
+    }
+    if (i < n) {
+      nextCode = ('[data:unicodeAt]' (i + 1) str)
+    }
+    local 'form' ('_ar_form' prevCode code nextCode)
+    local 'glyph' ('_ar_glyph' code form)
+    if (prevCode == 1604) {
+      if (code == 1575) {
+        glyph = ('_ar_glyph_lam_alif' form)
+        i += -1
+      } (code == 1571) {
+        glyph = ('_ar_glyph_lam_alif_hamza_above' form)
+        i += -1
+      } (code == 1570) {
+        glyph = ('_ar_glyph_lam_alif_madda' form)
+        i += -1
+      } (code == 1573) {
+        glyph = ('_ar_glyph_lam_alif_hamza_below' form)
+        i += -1
+      }
+    }
+    totalWidth += (size glyph)
+    i += -1
+  }
+  return totalWidth
+}
+
+to '_ar_wipe_in' {
+  local 'width' (_ar_devices * 8)
+  _ar_effectScreen = (newList width 0)
+  local 'x' width
+  repeatUntil (x < 1) {
+    atPut x _ar_effectScreen (at x _ar_effectTarget)
+    '_ar_screen_to_grid' _ar_effectScreen
+    waitMillis 8
+    x += -1
+  }
+}
+
+to '_ar_wipe_out' {
+  local 'width' (_ar_devices * 8)
+  for x width {
+    atPut x _ar_effectScreen 0
+    '_ar_screen_to_grid' _ar_effectScreen
+    waitMillis 8
+  }
+  ar_clear
+}
+
+to '_ar_write' reg val {
+  '_ar_spi_lock'
+  digitalWriteOp _ar_cs false
+  for d _ar_devices {
+    '_ar_spi_send' reg
+    '_ar_spi_send' val
+  }
+  digitalWriteOp _ar_cs true
+  '_ar_spi_unlock'
+}
+
+to ar_blink_text txt alignment onMs offMs repeatCount {
+  '_ar_ensure_ready'
+  local 'columns' 0
+  if ('_ar_group_is_arabic' txt) {
+    columns = ('_ar_compose_text' txt)
+  } else {
+    columns = ('_ar_compose_other' txt)
+  }
+  local 'width' (_ar_devices * 8)
+  local 'screen' (newList width 0)
+  local 'count' (minimum (size columns) width)
+  local 'src' 1
+  if ((size columns) > width) {
+    src = (((size columns) - width) + 1)
+  }
+  local 'dst' ((width - count) + 1)
+  if ((size columns) <= width) {
+    if (alignment == 'Left') {
+      dst = 1
+    } (alignment == 'Center') {
+      dst = (((width - count) / 2) + 1)
+    }
+  }
+  for i count {
+    atPut ((dst + i) - 1) screen (at ((src + i) - 1) columns)
+  }
+  local 'n' ('[data:convertType]' repeatCount 'number')
+  n = (maximum 0 n)
+  repeat n {
+    '_ar_screen_to_grid' screen
+    waitMillis (maximum 0 ('[data:convertType]' onMs 'number'))
+    atPut 'all' _ar_grid 0
+    '_ar_render'
+    waitMillis (maximum 0 ('[data:convertType]' offMs 'number'))
+  }
+}
+
+to ar_clear {
+  '_ar_ensure_ready'
+  atPut 'all' _ar_grid 0
+  '_ar_render'
+}
+
+to ar_digits value {
+  local 'str' ('[data:toString]' value)
+  local 'result' ''
+  for i (size str) {
+    local 'code' ('[data:unicodeAt]' i str)
+    if (and (code >= 48) (code <= 57)) {
+      result = ('[data:join]' result ('[data:unicodeString]' (code + 1584)))
+    } else {
+      result = ('[data:join]' result ('[data:copyFromTo]' str i i))
+    }
+  }
+  return result
+}
+
+to ar_display_power state {
+  '_ar_ensure_ready'
+  if (state == 'On') {
+    if (not _ar_displayOn) {
+      '_ar_write' 12 1
+      _ar_displayOn = true
+    }
+  } else {
+    if _ar_displayOn {
+      '_ar_write' 12 0
+      _ar_displayOn = false
+    }
+  }
+}
+
+to ar_icon icon {
+  if (icon == 'Heart') {return ('[data:unicodeString]' 9829)}
+  if (icon == 'Arrow Right') {return ('[data:unicodeString]' 8594)}
+  if (icon == 'Arrow Left') {return ('[data:unicodeString]' 8592)}
+  if (icon == 'Arrow Up') {return ('[data:unicodeString]' 8593)}
+  if (icon == 'Arrow Down') {return ('[data:unicodeString]' 8595)}
+  if (icon == 'Arrow Up Down') {return ('[data:unicodeString]' 8597)}
+  if (icon == 'Diamond') {return ('[data:unicodeString]' 9830)}
+  if (icon == 'Spade') {return ('[data:unicodeString]' 9824)}
+  if (icon == 'Circle Outline') {return ('[data:unicodeString]' 9675)}
+  if (icon == 'Square') {return ('[data:unicodeString]' 9632)}
+  if (icon == 'Bullet') {return ('[data:unicodeString]' 8226)}
+  if (icon == 'Sun Rays') {return ('[data:unicodeString]' 9788)}
+  if (icon == 'Degree') {return ('[data:unicodeString]' 176)}
+  if (icon == 'Plus Minus') {return ('[data:unicodeString]' 177)}
+  if (icon == 'Less Equal') {return ('[data:unicodeString]' 8804)}
+  if (icon == 'Greater Equal') {return ('[data:unicodeString]' 8805)}
+  if (icon == 'Paragraph') {return ('[data:unicodeString]' 182)}
+  if (icon == 'Male') {return ('[data:unicodeString]' 9794)}
+  if (icon == 'Female') {return ('[data:unicodeString]' 9792)}
+  if (icon == 'Music Beamed') {return ('[data:unicodeString]' 9835)}
+  if (icon == 'Micro') {return ('[data:unicodeString]' 181)}
+  if (icon == 'Cent') {return ('[data:unicodeString]' 162)}
+  if (icon == 'Pound') {return ('[data:unicodeString]' 163)}
+  if (icon == 'Yen') {return ('[data:unicodeString]' 165)}
+  return ''
+}
+
+to ar_init clk cs din matrixType maxDevices {
+  _ar_initState = 1
+  '_ar_init_hw' clk cs din matrixType maxDevices
+  _ar_initState = 2
+}
+
+to ar_scroll_mixed delayMs group1 group2 group3 group4 group5 {
+  '_ar_ensure_ready'
+  local 'totalWidth' 0
+  local 'pos' 0
+  if ((size group1) > 0) {
+    if ('_ar_group_is_arabic' group1) {
+      totalWidth += ('_ar_text_width' group1)
+    } else {
+      totalWidth += ('_ar_other_width' group1)
+    }
+    pos += 1
+  }
+  if ((size group2) > 0) {
+    if ('_ar_group_is_arabic' group2) {
+      totalWidth += ('_ar_text_width' group2)
+    } else {
+      totalWidth += ('_ar_other_width' group2)
+    }
+    pos += 1
+  }
+  if ((size group3) > 0) {
+    if ('_ar_group_is_arabic' group3) {
+      totalWidth += ('_ar_text_width' group3)
+    } else {
+      totalWidth += ('_ar_other_width' group3)
+    }
+    pos += 1
+  }
+  if ((size group4) > 0) {
+    if ('_ar_group_is_arabic' group4) {
+      totalWidth += ('_ar_text_width' group4)
+    } else {
+      totalWidth += ('_ar_other_width' group4)
+    }
+    pos += 1
+  }
+  if ((size group5) > 0) {
+    if ('_ar_group_is_arabic' group5) {
+      totalWidth += ('_ar_text_width' group5)
+    } else {
+      totalWidth += ('_ar_other_width' group5)
+    }
+    pos += 1
+  }
+  if (pos > 1) {
+    totalWidth += ((pos - 1) * _ar_mixedSpaceWidth)
+  }
+  _ar_mixedBuffer = (newList totalWidth 0)
+  pos = 1
+  local 'columns' 0
+  '#' Visual order: group5 '|' group4 '|' group3 '|' group2 '|' group1
+  if ((size group5) > 0) {
+    if ('_ar_group_is_arabic' group5) {
+      columns = ('_ar_compose_text' group5)
+    } else {
+      columns = ('_ar_compose_other' group5)
+    }
+    for c (size columns) {
+      atPut pos _ar_mixedBuffer (at c columns)
+      pos += 1
+    }
+  }
+  if ((size group4) > 0) {
+    if (pos > 1) {pos += _ar_mixedSpaceWidth}
+    if ('_ar_group_is_arabic' group4) {
+      columns = ('_ar_compose_text' group4)
+    } else {
+      columns = ('_ar_compose_other' group4)
+    }
+    for c (size columns) {
+      atPut pos _ar_mixedBuffer (at c columns)
+      pos += 1
+    }
+  }
+  if ((size group3) > 0) {
+    if (pos > 1) {pos += _ar_mixedSpaceWidth}
+    if ('_ar_group_is_arabic' group3) {
+      columns = ('_ar_compose_text' group3)
+    } else {
+      columns = ('_ar_compose_other' group3)
+    }
+    for c (size columns) {
+      atPut pos _ar_mixedBuffer (at c columns)
+      pos += 1
+    }
+  }
+  if ((size group2) > 0) {
+    if (pos > 1) {pos += _ar_mixedSpaceWidth}
+    if ('_ar_group_is_arabic' group2) {
+      columns = ('_ar_compose_text' group2)
+    } else {
+      columns = ('_ar_compose_other' group2)
+    }
+    for c (size columns) {
+      atPut pos _ar_mixedBuffer (at c columns)
+      pos += 1
+    }
+  }
+  if ((size group1) > 0) {
+    if (pos > 1) {pos += _ar_mixedSpaceWidth}
+    if ('_ar_group_is_arabic' group1) {
+      columns = ('_ar_compose_text' group1)
+    } else {
+      columns = ('_ar_compose_other' group1)
+    }
+    for c (size columns) {
+      atPut pos _ar_mixedBuffer (at c columns)
+      pos += 1
+    }
+  }
+  '_ar_scroll_columns_ltr' _ar_mixedBuffer delayMs
+}
+
+to ar_scroll_text txt direction delayMs {
+  '_ar_ensure_ready'
+  local 'columns' 0
+  local 'isArabic' ('_ar_group_is_arabic' txt)
+  if isArabic {
+    columns = ('_ar_compose_text' txt)
+  } else {
+    columns = ('_ar_compose_other' txt)
+  }
+  if (direction == 'LTR') {
+    '_ar_scroll_columns_ltr' columns delayMs
+  } (direction == 'RTL') {
+    '_ar_scroll_columns_rtl' columns delayMs
+  } else {
+    if isArabic {
+      '_ar_scroll_columns_ltr' columns delayMs
+    } else {
+      '_ar_scroll_columns_rtl' columns delayMs
+    }
+  }
+}
+
+to ar_set_brightness level {
+  '_ar_ensure_ready'
+  local 'value' ('[data:convertType]' level 'number')
+  value = (maximum 0 (minimum 15 value))
+  '_ar_write' 10 value
+}
+
+to ar_set_rotation rot {
+  '_ar_ensure_ready'
+  local 'r' ('[data:convertType]' rot 'number')
+  if (_ar_devices > 1) {
+    if (r < 180) {
+      _ar_rotation = 0
+    } else {
+      _ar_rotation = 180
+    }
+  } else {
+    if (r == 90) {
+      _ar_rotation = 90
+    } (r == 180) {
+      _ar_rotation = 180
+    } (r == 270) {
+      _ar_rotation = 270
+    } else {
+      _ar_rotation = 0
+    }
+  }
+}
+
+to ar_show_mixed group1 group2 group3 group4 group5 {
+  '_ar_ensure_ready'
+  local 'width' (_ar_devices * 8)
+  local 'screen' (newList width 0)
+  local 'x' width
+  local 'columns' 0
+  local 'hasPrevious' false
+  '#' Group 1
+  if ((size group1) > 0) {
+    if ('_ar_group_is_digits' group1) {
+      columns = ('_ar_compose_digits' group1)
+    } ('_ar_group_is_arabic' group1) {
+      columns = ('_ar_compose_text' group1)
+    } else {
+      columns = ('_ar_compose_ascii' group1)
+    }
+    x = ((x - (size columns)) + 1)
+    for c (size columns) {
+      if (and (x >= 1) (x <= width)) {atPut x screen (at c columns)}
+      x += 1
+    }
+    x = (x - (size columns))
+    x += -1
+    hasPrevious = true
+  }
+  '#' Group 2
+  if ((size group2) > 0) {
+    if hasPrevious {x += (0 - _ar_mixedSpaceWidth)}
+    if ('_ar_group_is_digits' group2) {
+      columns = ('_ar_compose_digits' group2)
+    } ('_ar_group_is_arabic' group2) {
+      columns = ('_ar_compose_text' group2)
+    } else {
+      columns = ('_ar_compose_ascii' group2)
+    }
+    x = ((x - (size columns)) + 1)
+    for c (size columns) {
+      if (and (x >= 1) (x <= width)) {atPut x screen (at c columns)}
+      x += 1
+    }
+    x = (x - (size columns))
+    x += -1
+    hasPrevious = true
+  }
+  '#' Group 3
+  if ((size group3) > 0) {
+    if hasPrevious {x += (0 - _ar_mixedSpaceWidth)}
+    if ('_ar_group_is_digits' group3) {
+      columns = ('_ar_compose_digits' group3)
+    } ('_ar_group_is_arabic' group3) {
+      columns = ('_ar_compose_text' group3)
+    } else {
+      columns = ('_ar_compose_ascii' group3)
+    }
+    x = ((x - (size columns)) + 1)
+    for c (size columns) {
+      if (and (x >= 1) (x <= width)) {atPut x screen (at c columns)}
+      x += 1
+    }
+    x = (x - (size columns))
+    x += -1
+    hasPrevious = true
+  }
+  '#' Group 4
+  if ((size group4) > 0) {
+    if hasPrevious {x += (0 - _ar_mixedSpaceWidth)}
+    if ('_ar_group_is_digits' group4) {
+      columns = ('_ar_compose_digits' group4)
+    } ('_ar_group_is_arabic' group4) {
+      columns = ('_ar_compose_text' group4)
+    } else {
+      columns = ('_ar_compose_ascii' group4)
+    }
+    x = ((x - (size columns)) + 1)
+    for c (size columns) {
+      if (and (x >= 1) (x <= width)) {atPut x screen (at c columns)}
+      x += 1
+    }
+    x = (x - (size columns))
+    x += -1
+    hasPrevious = true
+  }
+  '#' Group 5
+  if ((size group5) > 0) {
+    if hasPrevious {x += (0 - _ar_mixedSpaceWidth)}
+    if ('_ar_group_is_digits' group5) {
+      columns = ('_ar_compose_digits' group5)
+    } ('_ar_group_is_arabic' group5) {
+      columns = ('_ar_compose_text' group5)
+    } else {
+      columns = ('_ar_compose_ascii' group5)
+    }
+    x = ((x - (size columns)) + 1)
+    for c (size columns) {
+      if (and (x >= 1) (x <= width)) {atPut x screen (at c columns)}
+      x += 1
+    }
+  }
+  '_ar_screen_to_grid' screen
+}
+
+to ar_show_text txt alignment {
+  '_ar_ensure_ready'
+  local 'columns' 0
+  if ('_ar_group_is_arabic' txt) {
+    columns = ('_ar_compose_text' txt)
+  } else {
+    columns = ('_ar_compose_other' txt)
+  }
+  local 'width' (_ar_devices * 8)
+  local 'screen' (newList width 0)
+  local 'count' (minimum (size columns) width)
+  local 'src' 1
+  if ((size columns) > width) {
+    src = (((size columns) - width) + 1)
+  }
+  local 'dst' ((width - count) + 1)
+  if ((size columns) <= width) {
+    if (alignment == 'Left') {
+      dst = 1
+    } (alignment == 'Center') {
+      dst = (((width - count) / 2) + 1)
+    }
+  }
+  for i count {
+    atPut ((dst + i) - 1) screen (at ((src + i) - 1) columns)
+  }
+  '_ar_screen_to_grid' screen
+}
+
+to ar_test {
+  '_ar_ensure_ready'
+  local 'w' (_ar_devices * 8)
+  '#' Phase 1 : four logical corners.
+  atPut 'all' _ar_grid 0
+  '_ar_scan_pixel' 1 1 true
+  '_ar_scan_pixel' w 1 true
+  '_ar_scan_pixel' 1 8 true
+  '_ar_scan_pixel' w 8 true
+  '_ar_render'
+  waitMillis 500
+  '#' Clear.
+  atPut 'all' _ar_grid 0
+  '_ar_render'
+  '#---------------------------'
+  '#' Phase 2 : horizontal sweep.
+  for y 8 {
+    for x w {
+      '_ar_scan_pixel' x y true
+    }
+    '_ar_render'
+    waitMillis 35
+    for x w {
+      '_ar_scan_pixel' x y false
+    }
+  }
+  '#---------------------------'
+  '#' Phase 3 : vertical sweep.
+  for x w {
+    for y 8 {
+      '_ar_scan_pixel' x y true
+    }
+    '_ar_render'
+    waitMillis 20
+    for y 8 {
+      '_ar_scan_pixel' x y false
+    }
+  }
+  '#' Clear before module identification.
+  atPut 'all' _ar_grid 0
+  '_ar_render'
+  waitMillis 200
+  '#---------------------------'
+  '#' Phase 4 : progressive module identification.
+  '_ar_scan_modules'
+}
+
+to ar_text_effect txt alignment effect showMs {
+  '_ar_ensure_ready'
+  if ('_ar_group_is_arabic' txt) {
+    _ar_effectTarget = ('_ar_compose_text' txt)
+  } else {
+    _ar_effectTarget = ('_ar_compose_other' txt)
+  }
+  local 'width' (_ar_devices * 8)
+  local 'count' (minimum (size _ar_effectTarget) width)
+  local 'src' 1
+  if ((size _ar_effectTarget) > width) {
+    src = (((size _ar_effectTarget) - width) + 1)
+  }
+  _ar_effectScreen = (newList width 0)
+  if (and ((size _ar_effectTarget) <= width) (alignment == 'Left')) {
+    for i count {
+      atPut i _ar_effectScreen (at ((src + i) - 1) _ar_effectTarget)
+    }
+  } (and ((size _ar_effectTarget) <= width) (alignment == 'Center')) {
+    for i count {
+      atPut (((((width - count) / 2) + 1) + i) - 1) _ar_effectScreen (at ((src + i) - 1) _ar_effectTarget)
+    }
+  } else {
+    for i count {
+      atPut ((width - count) + i) _ar_effectScreen (at ((src + i) - 1) _ar_effectTarget)
+    }
+  }
+  _ar_effectTarget = _ar_effectScreen
+  if (effect == 'wipe') {
+    '_ar_wipe_in'
+    waitMillis (maximum 0 ('[data:convertType]' showMs 'number'))
+    '_ar_wipe_out'
+  } (effect == 'row wipe') {
+    '_ar_row_wipe_in'
+    waitMillis (maximum 0 ('[data:convertType]' showMs 'number'))
+    '_ar_row_wipe_out'
+  } (effect == 'curtain') {
+    '_ar_curtain_in'
+    waitMillis (maximum 0 ('[data:convertType]' showMs 'number'))
+    '_ar_curtain_out'
+  } else {
+    _ar_effectScreen = (newList width 0)
+    local 'order' ('_ar_shuffle_indices' (width * 8))
+    for k (width * 8) {
+      local 'idx' ((at k order) - 1)
+      local 'x' ((idx / 8) + 1)
+      local 'y' ((idx % 8) + 1)
+      if ((((at x _ar_effectTarget) >> (y - 1)) & 1) != 0) {
+        atPut x _ar_effectScreen ((at x _ar_effectScreen) | (1 << (y - 1)))
+      }
+      if ((k % _ar_devices) == 0) {
+        '_ar_screen_to_grid' _ar_effectScreen
+        waitMillis 2
+      }
+    }
+    '_ar_screen_to_grid' _ar_effectTarget
+    waitMillis (maximum 0 ('[data:convertType]' showMs 'number'))
+    '_ar_dissolve_out'
+  }
+}
+
+
+module WiFi Comm
+author MicroBlocks
+version 1 10 
+tags communication network 
+description 'Connect to a WiFi network. Used in conjunction with other network libraries, such as HTTP client, HTTP server or Web Thing.
+'
+
+  spec ' ' 'wifiConnect' 'wifi connect to _ password _ : IP _ gateway _ subnet _' 'str str auto auto auto' 'Network_Name' '' '192.168.1.42' '192.168.1.1' '255.255.255.0'
+  spec ' ' 'wifiCreateHotspot' 'wifi create hotspot _ password _' 'str str' 'Network_Name' 'Network_Password'
+  spec ' ' '[net:stopWiFi]' 'stop wifi'
+  space
+  spec ' ' '[net:setDomainName]' 'wifi set local domain name _ .local' 'str' 'microblocks'
+  space
+  spec 'r' 'getIPAddress' 'IP address'
+  spec 'r' '[net:myMAC]' 'MAC address'
+  space
+  spec ' ' '[net:allowWiFiAndBLE]' 'allow WiFi while using BLE _' 'bool' true
+
+to getIPAddress {
+  return ('[net:myIPAddress]')
+}
+
+to wifiConnect ssid password fixedIP gatewayIP subnetIP {
+  if (not ('[net:hasWiFi]')) {return}
+  '[net:stopWiFi]'
+  if ((pushArgCount) < 5) {
+    '[net:startWiFi]' ssid password
+  } else {
+    '[net:startWiFi]' ssid password false fixedIP gatewayIP subnetIP
+  }
+  local 'startMSecs' (millisOp)
+  repeatUntil (('[net:myIPAddress]') != '0.0.0.0') {
+    comment 'Timeout after N seconds'
+    if (((millisOp) - startMSecs) > 30000) {
+      sayIt 'Could not connect'
+      return 0
+    }
+    comment 'Slow blink while trying to connect'
+    setUserLED true
+    waitMillis 300
+    setUserLED false
+    waitMillis 300
+  }
+  repeat 6 {
+    comment 'Quick blinks when connected'
+    setUserLED true
+    waitMillis 50
+    setUserLED false
+    waitMillis 50
+  }
+  '[net:setDomainName]' 'microblocks'
+  sayIt 'My IP address is:' ('[net:myIPAddress]')
+}
+
+to wifiCreateHotspot ssid password {
+  if (not ('[net:hasWiFi]')) {return}
+  if ((size password) < 8) {
+    sayIt 'Password must be at least 8 characters'
+    return 0
+  }
+  '[net:startWiFi]' ssid password true
+  if ('Connected' != ('[net:wifiStatus]')) {
+    sayIt 'Could not create hotspot'
+    return 0
+  }
+  repeat 6 {
+    comment 'Quick blinks when connected'
+    setUserLED true
+    waitMillis 50
+    setUserLED false
+    waitMillis 50
+  }
+  '[net:setDomainName]' 'microblocks'
+  sayIt 'My IP address is:' ('[net:myIPAddress]')
+}
+
