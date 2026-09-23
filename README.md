@@ -65,7 +65,7 @@ Detailed wiring diagrams are included in the Educational Examples Guide.
 
 ## Installation
 
-1. Download [`LED-Matrix-Arabic-MAX7219-v1.2.ubl`](library/LED-Matrix-Arabic-MAX7219-v1.2.ubl).
+1. 1. Download [LED-Matrix-Arabic-MAX7219-v1.2.ubl](https://raw.githubusercontent.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/main/library/LED-Matrix-Arabic-MAX7219-v1.2.ubl).
 2. Open MicroBlocks.
 3. Import the library.
 4. Connect your board.
