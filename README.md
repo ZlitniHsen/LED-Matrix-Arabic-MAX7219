@@ -65,7 +65,7 @@ Detailed wiring diagrams are included in the Educational Examples Guide.
 
 ## Installation
 
-1. Download [LED-Matrix-Arabic-MAX7219-v1.2.ubl](https://raw.githubusercontent.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/main/library/LED-Matrix-Arabic-MAX7219-v1.2.ubl).
+1. Download [LED-Matrix-Arabic-MAX7219-v1.2.ubl](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/LED-Matrix-Arabic-MAX7219-v1.2.ubl).
 2. Open MicroBlocks.
 3. Import the library.
 4. Connect your board.
@@ -214,30 +214,28 @@ ON and OFF durations can be configured independently.
 
 ## Educational Examples
 
-Seven MicroBlocks example projects are included:
+Seven ready-to-use MicroBlocks example projects are included:
 
-1. [Show Arabic Text](examples/01-show-arabic-text.ubp)
-2. [Text Effects on Four GENERIC Matrices](examples/02-text-effects-generic-4.ubp)
-3. [Show Mixed Text](examples/03-show-mixed-text.ubp)
-4. [Blink Arabic Text](examples/04-blink-arabic-text.ubp)
-5. [Arabic-Indic Digits](examples/05-arabic-indic-digits.ubp)
-6. [Scroll Arabic Text](examples/06-scroll-arabic-text.ubp)
-7. [Scroll Mixed Text](examples/07-scroll-mixed-text.ubp)
+1. [Download — Show Arabic Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/01-show-arabic-text.ubp)
+2. [Download — Text Effects on Four GENERIC Matrices](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/02-text-effects-generic-4.ubp)
+3. [Download — Show Mixed Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/03-show-mixed-text.ubp)
+4. [Download — Blink Arabic Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/04-blink-arabic-text.ubp)
+5. [Download — Arabic-Indic Digits](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/05-arabic-indic-digits.ubp)
+6. [Download — Scroll Arabic Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/06-scroll-arabic-text.ubp)
+7. [Download — Scroll Mixed Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/07-scroll-mixed-text.ubp)
 
 The complete illustrated guide, including wiring diagrams, MicroBlocks programs and real hardware results, is available here:
 
-**[LED Matrix Arabic MAX7219 — Educational Examples Guide v1.2](docs/LED-Matrix-Arabic-MAX7219-Educational-Examples-v1.2.pdf)**
+[Download the Educational Examples Guide v1.2](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/LED-Matrix-Arabic-MAX7219-Educational-Examples-v1.2.pdf)
 
 ## Demo Videos
 
-Real hardware demonstration videos are included:
+Real hardware demonstration videos:
 
-- [Text Effects](videos/text-effects.mp4)
-- [Blink Arabic Text](videos/blink-arabic-text.mp4)
-- [Scroll Arabic Text](videos/scroll-arabic-text.mp4)
-- [Scroll Mixed Text](videos/scroll-mixed-text.mp4)
-
-The videos demonstrate functions whose behavior is easier to observe dynamically than in static photographs.
+- [Download — Text Effects](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/text-effects.mp4)
+- [Download — Blink Arabic Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/blink-arabic-text.mp4)
+- [Download — Scroll Arabic Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/scroll-arabic-text.mp4)
+- [Download — Scroll Mixed Text](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/scroll-mixed-text.mp4)
 
 ## Known Limitation
 
@@ -263,11 +261,12 @@ The display glyphs come from the following sources:
 
 ## Documentation and Resources
 
-- [Stable v1.2 library](library/LED-Matrix-Arabic-MAX7219-v1.2.ubl)
-- [Educational Examples Guide](docs/LED-Matrix-Arabic-MAX7219-Educational-Examples-v1.2.pdf)
-- [Example projects](examples/)
-- [Hardware images](images/)
-- [Demo videos](videos/)
+- [Download stable v1.2 library](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/LED-Matrix-Arabic-MAX7219-v1.2.ubl)
+- [Download Educational Examples Guide v1.2](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/download/v1.2/LED-Matrix-Arabic-MAX7219-Educational-Examples-v1.2.pdf)
+- [Browse example projects](examples/)
+- [Browse hardware images](images/)
+- [Browse demo videos](videos/)
+- [Release v1.2](https://github.com/ZlitniHsen/LED-Matrix-Arabic-MAX7219/releases/tag/v1.2)
 - [Changelog](CHANGELOG.md)
 - [License](LICENSE)
 
